@@ -1,6 +1,7 @@
 package org.example.outils;
 
 import jakarta.servlet.ServletContext;
+import java.lang.reflect.Method;
 import java.util.Map;
 
 public class UrlDispatcher {
@@ -58,8 +59,27 @@ public class UrlDispatcher {
             return "Aucune correspondance trouvée pour " + url;
         }
         
-        String result = mi.getControllerClass().getSimpleName() + "#" + mi.getMethod().getName();
-        System.out.println("✅ [UrlDispatcher] Trouvé: " + result);
-        return result;
+        String controllerMethodFormat = mi.getControllerClass().getSimpleName() + "#" + mi.getMethod().getName();
+        System.out.println("✅ [UrlDispatcher] Trouvé: " + controllerMethodFormat);
+        
+        // Invocation via reflection
+        try {
+            Class<?> controllerClass = mi.getControllerClass();
+            Method method = mi.getMethod();
+            
+            // Créer une instance du contrôleur
+            Object instance = controllerClass.getDeclaredConstructor().newInstance();
+            
+            // Invoquer la méthode via reflection
+            Object result = method.invoke(instance);
+            
+            System.out.println("✅ [UrlDispatcher] Résultat de l'invocation: " + result);
+            
+            return String.valueOf(result);
+        } catch (Exception e) {
+            System.err.println("❌ [UrlDispatcher] Erreur lors de l'invocation: " + e.getMessage());
+            e.printStackTrace();
+            return controllerMethodFormat;
+        }
     }
 }
