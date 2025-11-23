@@ -2,6 +2,8 @@ package org.example.outils;
 
 import jakarta.servlet.ServletContext;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class UrlDispatcher {
@@ -52,7 +54,25 @@ public class UrlDispatcher {
             return "Aucune correspondance trouvée pour " + url;
         }
         
+        // D'abord, chercher une correspondance exacte
         MethodInfo mi = urlMappings.get(url);
+        List<String> paramValues = new ArrayList<>();
+        
+        // Si pas de correspondance exacte, chercher un pattern dynamique
+        if (mi == null) {
+            System.out.println("🔎 [UrlDispatcher] Pas de correspondance exacte, recherche de pattern dynamique...");
+            for (Map.Entry<String, MethodInfo> entry : urlMappings.entrySet()) {
+                MethodInfo methodInfo = entry.getValue();
+                if (methodInfo.matches(url)) {
+                    mi = methodInfo;
+                    paramValues = methodInfo.extractParameters(url);
+                    System.out.println("✅ [UrlDispatcher] Pattern trouvé: " + entry.getKey() + 
+                        " avec paramètres: " + paramValues);
+                    break;
+                }
+            }
+        }
+        
         if (mi == null) {
             System.out.println("⚠️ [UrlDispatcher] Aucune correspondance pour '" + url + 
                 "' parmi " + urlMappings.size() + " routes");
@@ -70,8 +90,16 @@ public class UrlDispatcher {
             // Créer une instance du contrôleur
             Object instance = controllerClass.getDeclaredConstructor().newInstance();
             
-            // Invoquer la méthode via reflection
-            Object result = method.invoke(instance);
+            // Invoquer la méthode via reflection avec les paramètres extraits
+            Object result;
+            if (paramValues.isEmpty()) {
+                // Pas de paramètres, invocation simple
+                result = method.invoke(instance);
+            } else {
+                // Convertir les paramètres en tableau d'objets
+                Object[] args = paramValues.toArray();
+                result = method.invoke(instance, args);
+            }
             
             System.out.println("✅ [UrlDispatcher] Résultat de l'invocation: " + result);
             
