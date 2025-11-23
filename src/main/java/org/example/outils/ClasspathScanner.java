@@ -81,7 +81,7 @@ public class ClasspathScanner {
                     if (urlAnnotation != null) {
                         String url = urlAnnotation.value();
                         System.out.println("   ? Méthode: " + method.getName() + "  URL: " + url);
-                        urlMappings.put(url, new MethodInfo(cls, method));
+                        urlMappings.put(url, new MethodInfo(cls, method, url));
                     }
                 }
                 System.out.println("");
