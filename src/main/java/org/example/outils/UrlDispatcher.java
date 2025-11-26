@@ -1,6 +1,7 @@
 package org.example.outils;
 
 import jakarta.servlet.ServletContext;
+
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
@@ -9,7 +10,7 @@ import java.util.Map;
 public class UrlDispatcher {
 
     @SuppressWarnings("unchecked")
-    public static String handleRequest(String url, ServletContext ctx) {
+    public static Object handleRequest(String url, ServletContext ctx) {
         System.out.println("\n🔍 [UrlDispatcher] Recherche correspondance pour URL: '" + url + "'");
         
         if (ctx == null) {
@@ -45,13 +46,17 @@ public class UrlDispatcher {
             System.err.println("❌ [UrlDispatcher] Erreur pendant scan: " + t.getMessage());
         }
 
-        return "Aucune correspondance trouvée pour " + url;
+        ModelView mv = new ModelView();
+        mv.addObject("error", "Aucune correspondance trouvée pour " + url);
+        return mv;
     }
 
-    public static String handleRequest(String url, Map<String, MethodInfo> urlMappings) {
+    public static Object handleRequest(String url, Map<String, MethodInfo> urlMappings) {
         if (urlMappings == null) {
             System.out.println("⚠️ [UrlDispatcher] Map de mappings null!");
-            return "Aucune correspondance trouvée pour " + url;
+            ModelView mv = new ModelView();
+            mv.addObject("error", "Aucune correspondance trouvée pour " + url);
+            return mv;
         }
         
         // D'abord, chercher une correspondance exacte
@@ -76,7 +81,9 @@ public class UrlDispatcher {
         if (mi == null) {
             System.out.println("⚠️ [UrlDispatcher] Aucune correspondance pour '" + url + 
                 "' parmi " + urlMappings.size() + " routes");
-            return "Aucune correspondance trouvée pour " + url;
+            ModelView mv = new ModelView();
+            mv.addObject("error", "Aucune correspondance trouvée pour " + url);
+            return mv;
         }
         
         String controllerMethodFormat = mi.getControllerClass().getSimpleName() + "#" + mi.getMethod().getName();
@@ -103,11 +110,21 @@ public class UrlDispatcher {
             
             System.out.println("✅ [UrlDispatcher] Résultat de l'invocation: " + result);
             
-            return String.valueOf(result);
+            // Si le résultat est déjà un ModelView, le retourner directement
+            if (result instanceof ModelView) {
+                return result;
+            }
+            
+            // Sinon, créer un ModelView avec le résultat
+            ModelView mv = new ModelView();
+            mv.addObject("result", result);
+            return mv;
         } catch (Exception e) {
             System.err.println("❌ [UrlDispatcher] Erreur lors de l'invocation: " + e.getMessage());
             e.printStackTrace();
-            return controllerMethodFormat;
+            ModelView mv = new ModelView();
+            mv.addObject("error", "Erreur: " + e.getMessage());
+            return mv;
         }
     }
 }
