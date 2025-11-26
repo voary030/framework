@@ -65,7 +65,8 @@ public class ClasspathScanner {
                             classes.add(cls);
                         } catch (Throwable t) {
                             // Ignorer les erreurs de chargement des classes
-                            System.err.println("Erreur au chargement de " + className + ": " + t.getMessage());
+                            System.err.println("❌ Erreur au chargement de " + className + ": " + t.getMessage());
+                            t.printStackTrace(System.err);
                         }
                     }
                 }
@@ -105,7 +106,8 @@ public class ClasspathScanner {
                         classes.add(cls);
                     } catch (Throwable t) {
                         // Ignorer les erreurs de chargement
-                        System.err.println("Erreur au chargement de " + className + ": " + t.getMessage());
+                        System.err.println("❌ Erreur au chargement de " + className + ": " + t.getMessage());
+                        t.printStackTrace(System.err);
                     }
                 }
             }
