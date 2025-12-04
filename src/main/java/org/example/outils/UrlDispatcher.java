@@ -2,6 +2,7 @@ package org.example.outils;
 
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.http.HttpServletRequest;
+import org.example.annotation.RequestParam;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -133,7 +134,8 @@ public class UrlDispatcher {
 
     // Construit les arguments de la méthode en utilisant 
     // 1) les valeurs du pattern d'URL (ordre d'apparition)
-    // 2) les paramètres de requête (request.getParameter(name)) pour Sprint 6
+    // 2) @RequestParam pour cibler un paramètre spécifique (Sprint 6-bis)
+    // 3) les paramètres de requête par nom (request.getParameter(name)) pour Sprint 6
     private static Object[] buildArguments(Method method, List<String> urlParamValues,
                                            HttpServletRequest request, MethodInfo mi) {
         Class<?>[] paramTypes = method.getParameterTypes();
@@ -157,17 +159,29 @@ public class UrlDispatcher {
                 continue;
             }
 
-            // 1) Essayer d'utiliser les valeurs de l'URL si disponibles (ordre)
             String raw = null;
-            if (urlParamValues != null && urlIndex < urlParamValues.size()) {
-                raw = urlParamValues.get(urlIndex++);
-            }
 
-            // 2) Sinon, rechercher dans les paramètres de requête par nom de l'argument
-            if ((raw == null || raw.isEmpty()) && request != null) {
-                String name = params[i].getName(); // nécessite compilation avec -parameters pour noms exacts
-                String byName = request.getParameter(name);
-                if (byName != null) raw = byName;
+            // Sprint 6-bis: Vérifier si le paramètre a l'annotation @RequestParam
+            Parameter param = params[i];
+            RequestParam requestParamAnnotation = param.getAnnotation(RequestParam.class);
+            
+            if (requestParamAnnotation != null && request != null) {
+                // Utiliser la clé spécifiée dans @RequestParam
+                String paramKey = requestParamAnnotation.value();
+                raw = request.getParameter(paramKey);
+                System.out.println("   └─ @RequestParam(\"" + paramKey + "\") -> " + raw);
+            } else {
+                // 1) Essayer d'utiliser les valeurs de l'URL si disponibles (ordre)
+                if (urlParamValues != null && urlIndex < urlParamValues.size()) {
+                    raw = urlParamValues.get(urlIndex++);
+                }
+
+                // 2) Sinon, rechercher dans les paramètres de requête par nom de l'argument
+                if ((raw == null || raw.isEmpty()) && request != null) {
+                    String name = params[i].getName(); // nécessite compilation avec -parameters pour noms exacts
+                    String byName = request.getParameter(name);
+                    if (byName != null) raw = byName;
+                }
             }
 
             // Conversion de la chaîne en type attendu
