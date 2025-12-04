@@ -7,10 +7,6 @@ import java.lang.annotation.Target;
 
 /**
  * Annotation pour mapper une méthode aux requêtes DELETE
- * 
- * Exemple:
- *   @DeleteMapping("/users/{id}")
- *   public String deleteUser(int id) { ... }
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
