@@ -93,8 +93,23 @@ public class FrontServlet extends HttpServlet {
                 return;
         }
 
-        // Si rien ne correspond, afficher un message personnalisé
-        customServe(req, res);
+        // Sprint 6: Déléguer à UrlDispatcher pour résolution avec arguments
+        Object result = UrlDispatcher.handleRequest(path, getServletContext(), req);
+
+        if (result instanceof ModelView) {
+            handleModelView(req, res, (ModelView) result);
+            return;
+        }
+
+        // Sinon, afficher le résultat textuel ou message d'absence
+        try (PrintWriter out = res.getWriter()) {
+            res.setContentType("text/plain;charset=UTF-8");
+            if (result == null) {
+                out.println("Aucune correspondance trouvée pour: " + path);
+            } else {
+                out.println(result.toString());
+            }
+        }
     }
 
     private void customServe(HttpServletRequest req, HttpServletResponse res) throws IOException {

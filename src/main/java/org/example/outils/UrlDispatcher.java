@@ -1,16 +1,19 @@
 package org.example.outils;
 
 import jakarta.servlet.ServletContext;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 public class UrlDispatcher {
 
+    // Entrée principale utilisée par FrontServlet pour Sprint 6 (avec HttpServletRequest)
     @SuppressWarnings("unchecked")
-    public static Object handleRequest(String url, ServletContext ctx) {
+    public static Object handleRequest(String url, ServletContext ctx, HttpServletRequest request) {
         System.out.println("\n🔍 [UrlDispatcher] Recherche correspondance pour URL: '" + url + "'");
         
         if (ctx == null) {
@@ -26,7 +29,7 @@ public class UrlDispatcher {
             Map<String, MethodInfo> map = (Map<String, MethodInfo>) attr;
             System.out.println("   ├─ Nombre de routes: " + map.size());
             System.out.println("   └─ URLs disponibles: " + String.join(", ", map.keySet()));
-            return handleRequest(url, map);
+            return handleRequest(url, map, request);
         }
 
         // Si la map n'est pas présente, tenter un scan dynamique
@@ -40,7 +43,7 @@ public class UrlDispatcher {
             if (map != null) {
                 ctx.setAttribute(StartupListener.URL_MAPPINGS_KEY, map);
                 System.out.println("✅ [UrlDispatcher] Scan réussi, routes trouvées: " + map.size());
-                return handleRequest(url, map);
+                return handleRequest(url, map, request);
             }
         } catch (Throwable t) {
             System.err.println("❌ [UrlDispatcher] Erreur pendant scan: " + t.getMessage());
@@ -51,7 +54,13 @@ public class UrlDispatcher {
         return mv;
     }
 
+    // Ancienne entrée (sans HttpServletRequest) maintenue pour compatibilité interne
     public static Object handleRequest(String url, Map<String, MethodInfo> urlMappings) {
+        return handleRequest(url, urlMappings, null);
+    }
+
+    // Résolution avec support des arguments depuis HttpServletRequest (Sprint 6)
+    public static Object handleRequest(String url, Map<String, MethodInfo> urlMappings, HttpServletRequest request) {
         if (urlMappings == null) {
             System.out.println("⚠️ [UrlDispatcher] Map de mappings null!");
             ModelView mv = new ModelView();
@@ -97,16 +106,10 @@ public class UrlDispatcher {
             // Créer une instance du contrôleur
             Object instance = controllerClass.getDeclaredConstructor().newInstance();
             
-            // Invoquer la méthode via reflection avec les paramètres extraits
+            // Préparer les arguments de la méthode
             Object result;
-            if (paramValues.isEmpty()) {
-                // Pas de paramètres, invocation simple
-                result = method.invoke(instance);
-            } else {
-                // Convertir les paramètres en tableau d'objets
-                Object[] args = paramValues.toArray();
-                result = method.invoke(instance, args);
-            }
+            Object[] args = buildArguments(method, paramValues, request, mi);
+            result = args.length == 0 ? method.invoke(instance) : method.invoke(instance, args);
             
             System.out.println("✅ [UrlDispatcher] Résultat de l'invocation: " + result);
             
@@ -126,5 +129,72 @@ public class UrlDispatcher {
             mv.addObject("error", "Erreur: " + e.getMessage());
             return mv;
         }
+    }
+
+    // Construit les arguments de la méthode en utilisant 
+    // 1) les valeurs du pattern d'URL (ordre d'apparition)
+    // 2) les paramètres de requête (request.getParameter(name)) pour Sprint 6
+    private static Object[] buildArguments(Method method, List<String> urlParamValues,
+                                           HttpServletRequest request, MethodInfo mi) {
+        Class<?>[] paramTypes = method.getParameterTypes();
+        Parameter[] params = method.getParameters();
+
+        if ((paramTypes == null || paramTypes.length == 0)) {
+            return new Object[0];
+        }
+
+        Object[] args = new Object[paramTypes.length];
+
+        // Index de lecture pour les valeurs extraites de l'URL
+        int urlIndex = 0;
+
+        for (int i = 0; i < paramTypes.length; i++) {
+            Class<?> type = paramTypes[i];
+
+            // Injection des objets de requête si demandés
+            if (request != null && (type == HttpServletRequest.class)) {
+                args[i] = request;
+                continue;
+            }
+
+            // 1) Essayer d'utiliser les valeurs de l'URL si disponibles (ordre)
+            String raw = null;
+            if (urlParamValues != null && urlIndex < urlParamValues.size()) {
+                raw = urlParamValues.get(urlIndex++);
+            }
+
+            // 2) Sinon, rechercher dans les paramètres de requête par nom de l'argument
+            if ((raw == null || raw.isEmpty()) && request != null) {
+                String name = params[i].getName(); // nécessite compilation avec -parameters pour noms exacts
+                String byName = request.getParameter(name);
+                if (byName != null) raw = byName;
+            }
+
+            // Conversion de la chaîne en type attendu
+            args[i] = convert(raw, type);
+        }
+
+        return args;
+    }
+
+    private static Object convert(String value, Class<?> targetType) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            if (targetType == String.class) return value;
+            if (targetType == int.class || targetType == Integer.class) return Integer.parseInt(value);
+            if (targetType == long.class || targetType == Long.class) return Long.parseLong(value);
+            if (targetType == double.class || targetType == Double.class) return Double.parseDouble(value);
+            if (targetType == float.class || targetType == Float.class) return Float.parseFloat(value);
+            if (targetType == boolean.class || targetType == Boolean.class) return Boolean.parseBoolean(value);
+            if (targetType == short.class || targetType == Short.class) return Short.parseShort(value);
+            if (targetType == byte.class || targetType == Byte.class) return Byte.parseByte(value);
+        } catch (Exception e) {
+            System.err.println("⚠️ [UrlDispatcher] Conversion échouée pour valeur '" + value + "' en " + targetType.getSimpleName());
+            return null;
+        }
+        // Types non gérés: retourner brut
+        return value;
     }
 }
