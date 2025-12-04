@@ -10,7 +10,7 @@ public class ModelView {
     }
 
     public ModelView(String view) {
-        this.view = view;
+        this.view = view ;
     }
 
     public String getView() {
