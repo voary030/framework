@@ -12,6 +12,89 @@ import java.util.Map;
 
 public class UrlDispatcher {
 
+    // Sprint 7: Nouvelle entrée pour supporter les méthodes HTTP
+    @SuppressWarnings("unchecked")
+    public static Object handleRequestWithMethod(String url, ServletContext ctx, HttpServletRequest request, String httpMethod) {
+        System.out.println("\n🔍 [UrlDispatcher] Recherche " + httpMethod + " " + url);
+        
+        if (ctx == null) {
+            System.out.println("⚠️ [UrlDispatcher] ServletContext est null!");
+            return "Aucune correspondance trouvée pour " + httpMethod + " " + url;
+        }
+
+        // Sprint 7: Chercher dans les MethodMappings
+        Object attr = ctx.getAttribute(StartupListener.METHOD_MAPPINGS_KEY);
+        if (attr instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, MethodMapping> map = (Map<String, MethodMapping>) attr;
+            System.out.println("📦 [UrlDispatcher] MethodMappings trouvées: " + map.size());
+            return handleRequestWithMethodMappings(url, httpMethod, map, request);
+        }
+
+        // Fallback sur ancien système si pas de MethodMappings
+        System.out.println("⚠️ [UrlDispatcher] Pas de MethodMappings, essai du système antérieur...");
+        return handleRequest(url, ctx, request);
+    }
+
+    // Résolution avec MethodMapping (Sprint 7)
+    private static Object handleRequestWithMethodMappings(String url, String httpMethod, 
+                                                           Map<String, MethodMapping> methodMappings, 
+                                                           HttpServletRequest request) {
+        if (methodMappings == null || methodMappings.isEmpty()) {
+            System.out.println("⚠️ [UrlDispatcher] Aucun mapping disponible");
+            ModelView mv = new ModelView();
+            mv.addObject("error", "Aucune correspondance trouvée pour " + httpMethod + " " + url);
+            return mv;
+        }
+
+        MethodMapping mapping = null;
+        List<String> paramValues = new ArrayList<>();
+
+        // Chercher un mapping correspondant par méthode HTTP et URL
+        for (Map.Entry<String, MethodMapping> entry : methodMappings.entrySet()) {
+            MethodMapping m = entry.getValue();
+            if (m.matches(url, httpMethod)) {
+                mapping = m;
+                paramValues = m.extractParameters(url);
+                System.out.println("✅ [UrlDispatcher] Trouvé: " + httpMethod + " " + m.getUrlPattern());
+                break;
+            }
+        }
+
+        if (mapping == null) {
+            System.out.println("⚠️ [UrlDispatcher] Aucun mapping pour " + httpMethod + " " + url);
+            ModelView mv = new ModelView();
+            mv.addObject("error", "Aucune correspondance trouvée pour " + httpMethod + " " + url);
+            return mv;
+        }
+
+        // Invoquer la méthode
+        try {
+            Class<?> controllerClass = mapping.getControllerClass();
+            Method method = mapping.getMethod();
+            Object instance = controllerClass.getDeclaredConstructor().newInstance();
+
+            Object[] args = buildArguments(method, paramValues, request, mapping);
+            Object result = args.length == 0 ? method.invoke(instance) : method.invoke(instance, args);
+
+            System.out.println("✅ [UrlDispatcher] Résultat: " + result);
+
+            if (result instanceof ModelView) {
+                return result;
+            }
+
+            ModelView mv = new ModelView();
+            mv.addObject("result", result);
+            return mv;
+        } catch (Exception e) {
+            System.err.println("❌ [UrlDispatcher] Erreur lors de l'invocation: " + e.getMessage());
+            e.printStackTrace();
+            ModelView mv = new ModelView();
+            mv.addObject("error", "Erreur: " + e.getMessage());
+            return mv;
+        }
+    }
+
     // Entrée principale utilisée par FrontServlet pour Sprint 6 (avec HttpServletRequest)
     @SuppressWarnings("unchecked")
     public static Object handleRequest(String url, ServletContext ctx, HttpServletRequest request) {
@@ -132,6 +215,12 @@ public class UrlDispatcher {
         }
     }
 
+    // Surcharge pour MethodMapping (Sprint 7)
+    private static Object[] buildArguments(Method method, List<String> urlParamValues,
+                                           HttpServletRequest request, MethodMapping mapping) {
+        return buildArgumentsGeneric(method, urlParamValues, request, mapping != null ? mapping.getParameterNames() : null);
+    }
+
     // Construit les arguments de la méthode avec ordre de priorité Sprint 6-ter:
     // 1) Paramètres d'URL par nom (ex: {id} injected into arg "id")
     // 2) @RequestParam pour cibler un paramètre spécifique (Sprint 6-bis)
@@ -139,6 +228,11 @@ public class UrlDispatcher {
     // 4) null (non trouvé)
     private static Object[] buildArguments(Method method, List<String> urlParamValues,
                                            HttpServletRequest request, MethodInfo mi) {
+        return buildArgumentsGeneric(method, urlParamValues, request, mi != null ? mi.getParameterNames() : null);
+    }
+
+    private static Object[] buildArgumentsGeneric(Method method, List<String> urlParamValues,
+                                                   HttpServletRequest request, List<String> urlParamNames) {
         Class<?>[] paramTypes = method.getParameterTypes();
         Parameter[] params = method.getParameters();
 
@@ -149,7 +243,6 @@ public class UrlDispatcher {
         Object[] args = new Object[paramTypes.length];
         
         // Construire une map des paramètres URL par nom (Sprint 6-ter)
-        List<String> urlParamNames = mi.getParameterNames();
         java.util.Map<String, String> urlParams = new java.util.HashMap<>();
         if (urlParamNames != null && urlParamValues != null) {
             for (int i = 0; i < urlParamNames.size() && i < urlParamValues.size(); i++) {

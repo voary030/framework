@@ -59,6 +59,7 @@ public class FrontServlet extends HttpServlet {
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         String path = req.getRequestURI().substring(req.getContextPath().length()).toLowerCase();
+        String httpMethod = req.getMethod().toUpperCase();  // GET, POST, PUT, DELETE, etc.
 
         // Vérifier si la ressource existe
         boolean ressources = getServletContext().getResource(path) != null;
@@ -81,20 +82,8 @@ public class FrontServlet extends HttpServlet {
             }
         }
 
-        // Chercher un contrôleur pour cette URL
-        Method m = null;
-        MethodInfo mi = urlMappings.get(path);
-        if (mi != null) {
-            m = mi.getMethod();
-        }
-
-        if (m != null) {
-            if (handleMappedMethod(req, res, m))
-                return;
-        }
-
-        // Sprint 6: Déléguer à UrlDispatcher pour résolution avec arguments
-        Object result = UrlDispatcher.handleRequest(path, getServletContext(), req);
+        // Sprint 7: Déléguer à UrlDispatcher avec la méthode HTTP
+        Object result = UrlDispatcher.handleRequestWithMethod(path, getServletContext(), req, httpMethod);
 
         if (result instanceof ModelView) {
             handleModelView(req, res, (ModelView) result);
@@ -105,7 +94,7 @@ public class FrontServlet extends HttpServlet {
         try (PrintWriter out = res.getWriter()) {
             res.setContentType("text/plain;charset=UTF-8");
             if (result == null) {
-                out.println("Aucune correspondance trouvée pour: " + path);
+                out.println("Aucune correspondance trouvée pour: " + httpMethod + " " + path);
             } else {
                 out.println(result.toString());
             }
