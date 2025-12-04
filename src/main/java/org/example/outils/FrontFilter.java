@@ -35,7 +35,7 @@ public class FrontFilter implements Filter {
         response.setContentType("text/plain;charset=UTF-8");
 
         // Résoudre l'URL via UrlDispatcher et afficher Controller#method ou message d'absence
-        Object result = UrlDispatcher.handleRequest(routePath, servletContext);
+        Object result = UrlDispatcher.handleRequest(routePath, servletContext, request);
         try (PrintWriter printWriter = response.getWriter()) {
             if (result instanceof ModelView) {
                 ModelView mv = (ModelView) result;
