@@ -132,10 +132,11 @@ public class UrlDispatcher {
         }
     }
 
-    // Construit les arguments de la méthode en utilisant 
-    // 1) les valeurs du pattern d'URL (ordre d'apparition)
+    // Construit les arguments de la méthode avec ordre de priorité Sprint 6-ter:
+    // 1) Paramètres d'URL par nom (ex: {id} injected into arg "id")
     // 2) @RequestParam pour cibler un paramètre spécifique (Sprint 6-bis)
-    // 3) les paramètres de requête par nom (request.getParameter(name)) pour Sprint 6
+    // 3) Paramètres de requête par nom (request.getParameter(name)) pour Sprint 6
+    // 4) null (non trouvé)
     private static Object[] buildArguments(Method method, List<String> urlParamValues,
                                            HttpServletRequest request, MethodInfo mi) {
         Class<?>[] paramTypes = method.getParameterTypes();
@@ -146,9 +147,15 @@ public class UrlDispatcher {
         }
 
         Object[] args = new Object[paramTypes.length];
-
-        // Index de lecture pour les valeurs extraites de l'URL
-        int urlIndex = 0;
+        
+        // Construire une map des paramètres URL par nom (Sprint 6-ter)
+        List<String> urlParamNames = mi.getParameterNames();
+        java.util.Map<String, String> urlParams = new java.util.HashMap<>();
+        if (urlParamNames != null && urlParamValues != null) {
+            for (int i = 0; i < urlParamNames.size() && i < urlParamValues.size(); i++) {
+                urlParams.put(urlParamNames.get(i), urlParamValues.get(i));
+            }
+        }
 
         for (int i = 0; i < paramTypes.length; i++) {
             Class<?> type = paramTypes[i];
@@ -160,27 +167,26 @@ public class UrlDispatcher {
             }
 
             String raw = null;
-
-            // Sprint 6-bis: Vérifier si le paramètre a l'annotation @RequestParam
             Parameter param = params[i];
-            RequestParam requestParamAnnotation = param.getAnnotation(RequestParam.class);
-            
-            if (requestParamAnnotation != null && request != null) {
-                // Utiliser la clé spécifiée dans @RequestParam
+            String argName = param.getName();
+
+            // Sprint 6-ter: Priorité 1 - Chercher le paramètre dans les params d'URL par nom
+            if (urlParams.containsKey(argName)) {
+                raw = urlParams.get(argName);
+                System.out.println("   └─ URL param {" + argName + "} -> " + raw);
+            }
+            // Sprint 6-bis: Priorité 2 - Vérifier @RequestParam
+            else if (param.getAnnotation(RequestParam.class) != null && request != null) {
+                RequestParam requestParamAnnotation = param.getAnnotation(RequestParam.class);
                 String paramKey = requestParamAnnotation.value();
                 raw = request.getParameter(paramKey);
                 System.out.println("   └─ @RequestParam(\"" + paramKey + "\") -> " + raw);
-            } else {
-                // 1) Essayer d'utiliser les valeurs de l'URL si disponibles (ordre)
-                if (urlParamValues != null && urlIndex < urlParamValues.size()) {
-                    raw = urlParamValues.get(urlIndex++);
-                }
-
-                // 2) Sinon, rechercher dans les paramètres de requête par nom de l'argument
-                if ((raw == null || raw.isEmpty()) && request != null) {
-                    String name = params[i].getName(); // nécessite compilation avec -parameters pour noms exacts
-                    String byName = request.getParameter(name);
-                    if (byName != null) raw = byName;
+            }
+            // Sprint 6: Priorité 3 - Paramètres de requête par nom d'argument
+            else if (request != null) {
+                raw = request.getParameter(argName);
+                if (raw != null) {
+                    System.out.println("   └─ Query param '" + argName + "' -> " + raw);
                 }
             }
 
