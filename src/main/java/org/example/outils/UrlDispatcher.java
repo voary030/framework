@@ -259,6 +259,30 @@ public class UrlDispatcher {
                 continue;
             }
 
+            // SPRINT 8: Injection de Map<String, Object> depuis request.getParameterMap()
+            if (request != null && type == Map.class) {
+                System.out.println("🗺️ [UrlDispatcher] Sprint 8: Transformation des paramètres en Map<String, Object>");
+                java.util.Map<String, Object> paramMap = new java.util.HashMap<>();
+                
+                // Récupérer request.getParameterMap() qui retourne Map<String, String[]>
+                java.util.Map<String, String[]> rawParams = request.getParameterMap();
+                
+                // Parcourir dynamiquement et transformer String[] en Object (première valeur)
+                for (java.util.Map.Entry<String, String[]> entry : rawParams.entrySet()) {
+                    String key = entry.getKey();
+                    String[] values = entry.getValue();
+                    
+                    // Prendre la première valeur si elle existe
+                    Object value = (values != null && values.length > 0) ? values[0] : null;
+                    paramMap.put(key, value);
+                    
+                    System.out.println("   └─ " + key + " = " + value);
+                }
+                
+                args[i] = paramMap;
+                continue;
+            }
+
             String raw = null;
             Parameter param = params[i];
             String argName = param.getName();

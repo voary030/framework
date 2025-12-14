@@ -15,12 +15,14 @@ import org.example.outils.*;
 
 public class FrontServlet extends HttpServlet {
     private RequestDispatcher defaultDispatcher;
+    private RequestDispatcher jspDispatcher;
     private Map<String, MethodInfo> urlMappings = new java.util.HashMap<>();
 
     @Override
     public void init() throws ServletException {
         super.init();
         defaultDispatcher = getServletContext().getNamedDispatcher("default");
+        jspDispatcher = getServletContext().getNamedDispatcher("jsp");
         
         try {
             // Utiliser les mappings du StartupListener au lieu de rescanner
@@ -74,10 +76,17 @@ public class FrontServlet extends HttpServlet {
             }
             return;
         } else if (ressources) {
-            // Si c'est une ressource statique existante, la servir avec le default dispatcher
-            RequestDispatcher rd = getServletContext().getNamedDispatcher("default");
-            if (rd != null) {
-                rd.forward(req, res);
+            // Si c'est une ressource statique existante, prioriser la servlet JSP si c'est une JSP
+            try {
+                if (path.endsWith(".jsp") && jspDispatcher != null) {
+                    jspDispatcher.forward(req, res);
+                    return;
+                }
+            } catch (Exception ignored) { }
+
+            // Sinon servir la ressource via le dispatcher par défaut
+            if (defaultDispatcher != null) {
+                defaultDispatcher.forward(req, res);
                 return;
             }
         }
