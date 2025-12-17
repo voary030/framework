@@ -66,8 +66,14 @@ public class FrontServlet extends HttpServlet {
         // Vérifier si la ressource existe
         boolean ressources = getServletContext().getResource(path) != null;
 
-        // Si c'est la racine, afficher un message personnalisé
+        // Si c'est la racine, forward vers la page d'accueil (index.jsp)
         if ("/".equals(path)) {
+            RequestDispatcher rd = req.getRequestDispatcher("/index.jsp");
+            if (rd != null) {
+                rd.forward(req, res);
+                return;
+            }
+            // fallback minimal si le dispatcher est introuvable
             res.setContentType("text/html");
             try (PrintWriter out = res.getWriter()) {
                 out.println("<html><body>");
