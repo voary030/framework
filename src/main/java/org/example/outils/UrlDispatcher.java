@@ -259,24 +259,30 @@ public class UrlDispatcher {
                 continue;
             }
 
-            // SPRINT 8: Injection de Map<String, Object> depuis request.getParameterMap()
+            // SPRINT 8-BIS: Injection de Map<String, Object> depuis request.getParameterMap()
+            // Amélioration: garder String[] pour champs multiples, String pour champs simples
             if (request != null && type == Map.class) {
-                System.out.println("🗺️ [UrlDispatcher] Sprint 8: Transformation des paramètres en Map<String, Object>");
+                System.out.println("🗺️ [UrlDispatcher] Sprint 8-BIS: Transformation des paramètres en Map<String, Object>");
                 java.util.Map<String, Object> paramMap = new java.util.HashMap<>();
                 
                 // Récupérer request.getParameterMap() qui retourne Map<String, String[]>
                 java.util.Map<String, String[]> rawParams = request.getParameterMap();
                 
-                // Parcourir dynamiquement et transformer String[] en Object (première valeur)
+                // Parcourir dynamiquement et transformer String[] en Object
+                // OPTION 1 (Sprint 8-BIS): Si 1 seule valeur → String, sinon → String[]
                 for (java.util.Map.Entry<String, String[]> entry : rawParams.entrySet()) {
                     String key = entry.getKey();
                     String[] values = entry.getValue();
                     
-                    // Prendre la première valeur si elle existe
-                    Object value = (values != null && values.length > 0) ? values[0] : null;
+                    // SPRINT 8-BIS: Préserver les données multiples (checkboxes, select multiple, etc.)
+                    Object value = (values != null && values.length == 1) ? values[0] : values;
                     paramMap.put(key, value);
                     
-                    System.out.println("   └─ " + key + " = " + value);
+                    if (values != null && values.length > 1) {
+                        System.out.println("   └─ " + key + " (multi) = " + java.util.Arrays.toString(values));
+                    } else {
+                        System.out.println("   └─ " + key + " = " + value);
+                    }
                 }
                 
                 args[i] = paramMap;
