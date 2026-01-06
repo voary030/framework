@@ -25,34 +25,16 @@ public class FrontServlet extends HttpServlet {
         jspDispatcher = getServletContext().getNamedDispatcher("jsp");
         
         try {
-            // Utiliser les mappings du StartupListener au lieu de rescanner
-            @SuppressWarnings("unchecked")
-            Map<String, MethodInfo> contextMappings = (Map<String, MethodInfo>) getServletContext()
-                .getAttribute(StartupListener.URL_MAPPINGS_KEY);
-            
-            if (contextMappings != null && !contextMappings.isEmpty()) {
-                urlMappings = contextMappings;
+            // SPRINT 9: Utiliser les MethodMappings du StartupListener (qui contient 12 routes)
+            // Ne pas essayer de cast en MethodInfo car StartupListener stock maintenant des MethodMapping
+            Object attr = getServletContext().getAttribute(StartupListener.METHOD_MAPPINGS_KEY);
+            if (attr instanceof Map) {
                 System.out.println("✅ [FrontServlet] Utilisation des mappings du StartupListener");
             } else {
-                // Fallback si StartupListener n'a pas fonctionné
-                System.out.println("⚠️  [FrontServlet] StartupListener mappings introuvables, scan local...");
-                urlMappings = ClasspathScanner.scan("org.example.test");
+                System.out.println("⚠️  [FrontServlet] StartupListener mappings introuvables");
             }
             
-            if (urlMappings == null) {
-                urlMappings = new java.util.HashMap<>();
-            }
-            
-            getServletContext().setAttribute("controllerMappings", urlMappings);
-
-            // debug : lister mappings
-            System.out.println("📋 [FrontServlet] URLs mappées (" + urlMappings.size() + " routes):");
-            for (Map.Entry<String, MethodInfo> entry : urlMappings.entrySet()) {
-                System.out.println("   ├─ " + entry.getKey() + " -> " +
-                        entry.getValue().getControllerClass().getName() + "#" + entry.getValue().getMethod().getName());
-            }
         } catch (Exception ex) {
-            urlMappings = new java.util.HashMap<>();
             System.err.println("❌ [FrontServlet] ControllerScanner init error: " + ex.getMessage());
             ex.printStackTrace();
         }
@@ -99,6 +81,18 @@ public class FrontServlet extends HttpServlet {
 
         // Sprint 7: Déléguer à UrlDispatcher avec la méthode HTTP
         Object result = UrlDispatcher.handleRequestWithMethod(path, getServletContext(), req, httpMethod);
+
+        // Sprint 9: si JsonResponse -> écrire JSON et ne pas dispatcher
+        if (result instanceof JsonResponse) {
+            JsonResponse json = (JsonResponse) result;
+            res.setContentType("application/json;charset=UTF-8");
+            try {
+                // Utiliser le code défini dans la réponse (200 par défaut)
+                res.setStatus(json.getCode());
+            } catch (Throwable ignored) {}
+            res.getWriter().write(json.toJson());
+            return;
+        }
 
         if (result instanceof ModelView) {
             handleModelView(req, res, (ModelView) result);

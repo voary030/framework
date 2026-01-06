@@ -21,23 +21,25 @@ public class FrontFilter implements Filter {
             filterChain.doFilter(servletRequest, servletResponse);
             return;
         }
-        String servletPath = request.getServletPath();
+        
+        // SPRINT 9: Utiliser getRequestURI() comme FrontServlet, pas getServletPath() qui peut être vide
+        String routePath = request.getRequestURI().substring(request.getContextPath().length()).toLowerCase();
+        String httpMethod = request.getMethod().toUpperCase();
         ServletContext servletContext = request.getServletContext();
-
-        // Extraire l'URL sans le préfixe /api
-        // /api/etudiant/liste → /etudiant/liste
-        String routePath = servletPath;
-        if (servletPath.startsWith("/api/")) {
-            routePath = servletPath.substring(4); // Enlever "/api"
-        }
 
         HttpServletResponse response = (HttpServletResponse) servletResponse;
         response.setContentType("text/plain;charset=UTF-8");
 
-        // Résoudre l'URL via UrlDispatcher et afficher Controller#method ou message d'absence
-        Object result = UrlDispatcher.handleRequest(routePath, servletContext, request);
+        // SPRINT 9: Utiliser handleRequestWithMethod pour supporter les méthodes HTTP ET JSON
+        Object result = UrlDispatcher.handleRequestWithMethod(routePath, servletContext, request, httpMethod);
         try (PrintWriter printWriter = response.getWriter()) {
-            if (result instanceof ModelView) {
+            if (result instanceof JsonResponse) {
+                // SPRINT 9: Si c'est une JsonResponse, afficher en JSON
+                JsonResponse json = (JsonResponse) result;
+                response.setContentType("application/json;charset=UTF-8");
+                response.setStatus(json.getCode());
+                printWriter.print(json.toJson());
+            } else if (result instanceof ModelView) {
                 ModelView mv = (ModelView) result;
                 printWriter.print("View: " + mv.getView() + "\n");
                 printWriter.print("Model: " + mv.getModel());
