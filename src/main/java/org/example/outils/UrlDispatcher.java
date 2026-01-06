@@ -3,6 +3,7 @@ package org.example.outils;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.http.HttpServletRequest;
 import org.example.annotation.RequestParam;
+import org.example.annotation.JSON;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -15,7 +16,7 @@ public class UrlDispatcher {
     // Sprint 7: Nouvelle entrée pour supporter les méthodes HTTP
     @SuppressWarnings("unchecked")
     public static Object handleRequestWithMethod(String url, ServletContext ctx, HttpServletRequest request, String httpMethod) {
-        System.out.println("\n🔍 [UrlDispatcher] Recherche " + httpMethod + " " + url);
+        System.out.println("\n🔍 [UrlDispatcher] Recherche " + httpMethod + " '" + url + "'");
         
         if (ctx == null) {
             System.out.println("⚠️ [UrlDispatcher] ServletContext est null!");
@@ -78,6 +79,10 @@ public class UrlDispatcher {
             Object result = args.length == 0 ? method.invoke(instance) : method.invoke(instance, args);
 
             System.out.println("✅ [UrlDispatcher] Résultat: " + result);
+            // Sprint 9: si annoté @JSON, retourner réponse JSON selon norme
+            if (method.isAnnotationPresent(JSON.class)) {
+                return buildJsonResponse(result);
+            }
 
             if (result instanceof ModelView) {
                 return result;
@@ -89,6 +94,12 @@ public class UrlDispatcher {
         } catch (Exception e) {
             System.err.println("❌ [UrlDispatcher] Erreur lors de l'invocation: " + e.getMessage());
             e.printStackTrace();
+            // Sprint 9: en cas d'erreur sur méthode annotée @JSON, retourner erreur JSON
+            try {
+                if (mapping != null && mapping.getMethod() != null && mapping.getMethod().isAnnotationPresent(JSON.class)) {
+                    return JsonResponse.error(e.getMessage());
+                }
+            } catch (Throwable ignored) {}
             ModelView mv = new ModelView();
             mv.addObject("error", "Erreur: " + e.getMessage());
             return mv;
@@ -197,6 +208,11 @@ public class UrlDispatcher {
             
             System.out.println("✅ [UrlDispatcher] Résultat de l'invocation: " + result);
             
+            // Sprint 9: si annoté @JSON, retourner réponse JSON selon norme
+            if (method.isAnnotationPresent(JSON.class)) {
+                return buildJsonResponse(result);
+            }
+
             // Si le résultat est déjà un ModelView, le retourner directement
             if (result instanceof ModelView) {
                 return result;
@@ -209,10 +225,43 @@ public class UrlDispatcher {
         } catch (Exception e) {
             System.err.println("❌ [UrlDispatcher] Erreur lors de l'invocation: " + e.getMessage());
             e.printStackTrace();
+            // Sprint 9: si annoté @JSON, retourner erreur JSON
+            try {
+                if (mi != null && mi.getMethod() != null && mi.getMethod().isAnnotationPresent(JSON.class)) {
+                    return JsonResponse.error(e.getMessage());
+                }
+            } catch (Throwable ignored) {}
             ModelView mv = new ModelView();
             mv.addObject("error", "Erreur: " + e.getMessage());
             return mv;
         }
+    }
+
+    // Sprint 9: construire la réponse JSON selon la norme donnée
+    private static JsonResponse buildJsonResponse(Object result) {
+        // Si le résultat est un ModelView, extraire ses données
+        if (result instanceof ModelView) {
+            ModelView mv = (ModelView) result;
+            Map<String, Object> data = mv.getData();
+            if (data == null || data.isEmpty()) {
+                return JsonResponse.success(null);
+            }
+            // Si une seule entrée, retourner directement la valeur
+            if (data.size() == 1) {
+                Object single = data.values().iterator().next();
+                return JsonResponse.success(single);
+            }
+            // Sinon, retourner l'ensemble de la map
+            return JsonResponse.success(data);
+        }
+
+        // Si le résultat est une liste, compter et retourner
+        if (result instanceof java.util.List) {
+            return JsonResponse.success(result);
+        }
+
+        // Sinon, retourner l'objet tel quel
+        return JsonResponse.success(result);
     }
 
     // Surcharge pour MethodMapping (Sprint 7)

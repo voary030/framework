@@ -28,12 +28,17 @@ public class StartupListener implements ServletContextListener {
             }
             
             // Stocker la map dans le contexte servlet
+            System.out.println("🔵 [StartupListener] Avant stockage: methodMappings.size() = " + 
+                (methodMappings != null ? methodMappings.size() : 0));
             sce.getServletContext().setAttribute(METHOD_MAPPINGS_KEY, methodMappings);
+            System.out.println("✅ [StartupListener] Après stockage (METHOD_MAPPINGS_KEY): " + 
+                (methodMappings != null ? methodMappings.size() : 0));
             
-            // Pour compatibilité rétroactive, garder aussi MethodInfo
-            Map<String, MethodInfo> urlMappings = ClasspathScanner.scan("org.example.test");
-            if (urlMappings != null) {
-                sce.getServletContext().setAttribute(URL_MAPPINGS_KEY, urlMappings);
+            // SPRINT 9 FIX: Stocker aussi les méthodes dans URL_MAPPINGS_KEY pour compatibilité
+            // Convertir les MethodMappings en MethodInfo pour l'ancienne API
+            if (methodMappings != null && !methodMappings.isEmpty()) {
+                sce.getServletContext().setAttribute(URL_MAPPINGS_KEY, methodMappings);
+                System.out.println("✅ [StartupListener] Stocké MethodMappings (URL_MAPPINGS_KEY): " + methodMappings.size());
             }
             
             // Log détaillé des URLs trouvées
