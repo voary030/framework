@@ -1,4 +1,4 @@
-package org.example.outils;
+package framework.views;
 
 import java.util.HashMap;
 
@@ -6,17 +6,14 @@ public class ModelView {
     private String view;
     private HashMap<String, Object> data = new HashMap<>();
 
+    public ModelView(String view) {
+        this.view = view;
+    }
     public ModelView() {
     }
-
-    public ModelView(String view) {
-        this.view = view ;
-    }
-
     public String getView() {
         return view;
     }
-
     public void setView(String view) {
         this.view = view;
     }
@@ -32,16 +29,5 @@ public class ModelView {
     public void addData(String key, Object value) {
         this.data.put(key, value);
     }
-
-    public HashMap<String, Object> getModel() {
-        return data;
-    }
-
-    public void addObject(String key, Object value) {
-        this.data.put(key, value);
-    }
-
-    public Object get(String key) {
-        return this.data.get(key);
-    }
+    
 }
